@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/go418/klone/pkg/mod"
+	"github.com/cert-manager/klone/pkg/mod"
 )
 
 type cleanup func()

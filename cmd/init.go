@@ -3,7 +3,7 @@ package cmd
 import (
 	"path/filepath"
 
-	"github.com/go418/klone/pkg/mod"
+	"github.com/cert-manager/klone/pkg/mod"
 	"github.com/spf13/cobra"
 )
 

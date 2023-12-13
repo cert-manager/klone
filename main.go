@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/go418/klone/cmd"
+	"github.com/cert-manager/klone/cmd"
 )
 
 func main() {
