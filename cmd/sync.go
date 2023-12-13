@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go418/klone/pkg/cache"
-	"github.com/go418/klone/pkg/download/git"
-	"github.com/go418/klone/pkg/mod"
+	"github.com/cert-manager/klone/pkg/cache"
+	"github.com/cert-manager/klone/pkg/download/git"
+	"github.com/cert-manager/klone/pkg/mod"
 	"github.com/spf13/cobra"
 )
 

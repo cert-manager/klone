@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/go418/klone/pkg/mod"
+	"github.com/cert-manager/klone/pkg/mod"
 	cp "github.com/otiai10/copy"
 )
 

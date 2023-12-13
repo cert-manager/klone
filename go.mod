@@ -1,4 +1,4 @@
-module github.com/go418/klone
+module github.com/cert-manager/klone
 
 go 1.21.1
 
