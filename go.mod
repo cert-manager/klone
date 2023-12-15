@@ -6,6 +6,7 @@ require (
 	github.com/otiai10/copy v1.12.0
 	github.com/rogpeppe/go-internal v1.11.0
 	github.com/spf13/cobra v1.7.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

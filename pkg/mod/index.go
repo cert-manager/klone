@@ -1,34 +1,36 @@
 package mod
 
 import (
-	"encoding/json"
+	"bufio"
 	"io"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"gopkg.in/yaml.v3"
 )
 
-const kloneFileName = "klone.json"
+const kloneFileName = "klone.yaml"
 
 type WorkDir string
 
 type kloneFile struct {
-	Targets map[string]KloneFolder `json:"targets"`
+	Targets map[string]KloneFolder `yaml:"targets"`
 }
 
 type KloneFolder []KloneItem
 
 type KloneItem struct {
-	FolderName  string `json:"folder_name"`
-	KloneSource `json:",inline"`
+	FolderName  string `yaml:"folder_name"`
+	KloneSource `yaml:",inline"`
 }
 
 type KloneSource struct {
-	RepoURL  string `json:"repo_url"`
-	RepoRef  string `json:"repo_ref"`
-	RepoHash string `json:"repo_hash"`
-	RepoPath string `json:"repo_path"`
+	RepoURL  string `yaml:"repo_url"`
+	RepoRef  string `yaml:"repo_ref"`
+	RepoHash string `yaml:"repo_hash"`
+	RepoPath string `yaml:"repo_path"`
 }
 
 func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
@@ -44,7 +46,7 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 	index := kloneFile{}
 
 	// decode current contents of index file
-	if err := json.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
+	if err := yaml.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -53,11 +55,57 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 		return err
 	}
 
-	file.Seek(0, 0)
-	file.Truncate(0)
+	topComments := ""
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	{
+		// go back to the beginning of the file
+		if _, err := file.Seek(0, 0); err != nil {
+			return err
+		}
+
+		comments := strings.Builder{}
+
+		// read lines until the first non-comment line
+		reader := bufio.NewReader(file)
+		for {
+			line, isPrefix, err := reader.ReadLine()
+			if err != nil {
+				return err
+			}
+
+			if !isPrefix && (len(line) > 0 && line[0] != '#') {
+				break
+			}
+
+			if _, err := comments.Write(line); err != nil {
+				return err
+			}
+
+			if !isPrefix {
+				if _, err := comments.WriteRune('\n'); err != nil {
+					return err
+				}
+			}
+		}
+
+		topComments = comments.String()
+	}
+
+	// truncate file
+	if _, err := file.Seek(0, 0); err != nil {
+		return err
+	}
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
+
+	// write comments
+	if _, err := file.WriteString(topComments); err != nil {
+		return err
+	}
+
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
 
 	if err := encoder.Encode(index); err != nil {
 		return err
@@ -79,7 +127,7 @@ func (w WorkDir) readKloneFile() (*kloneFile, error) {
 	index := kloneFile{}
 
 	// decode current contents of index file
-	if err := json.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
+	if err := yaml.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
 		return nil, err
 	}
 
