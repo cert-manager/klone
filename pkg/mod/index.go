@@ -26,6 +26,10 @@ type KloneItem struct {
 	KloneSource `yaml:",inline"`
 }
 
+func (i KloneItem) Less(other KloneItem) bool {
+	return i.FolderName < other.FolderName
+}
+
 type KloneSource struct {
 	RepoURL  string `yaml:"repo_url"`
 	RepoRef  string `yaml:"repo_ref"`
@@ -203,11 +207,7 @@ func (w WorkDir) FetchTargets(
 			}
 
 			sort.Slice(newSrcsArray, func(i, j int) bool {
-				return newSrcsArray[i].FolderName < newSrcsArray[j].FolderName ||
-					newSrcsArray[i].RepoURL < newSrcsArray[j].RepoURL ||
-					newSrcsArray[i].RepoRef < newSrcsArray[j].RepoRef ||
-					newSrcsArray[i].RepoHash < newSrcsArray[j].RepoHash ||
-					newSrcsArray[i].RepoPath < newSrcsArray[j].RepoPath
+				return newSrcsArray[i].Less(newSrcsArray[j])
 			})
 
 			for i, src := range newSrcsArray {
