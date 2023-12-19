@@ -147,17 +147,6 @@ func (w WorkDir) Init() error {
 	})
 }
 
-func (w WorkDir) RemoveTarget(target string, dep KloneItem) error {
-	return w.editKloneFile(func(kf *kloneFile) error {
-		if kf.Targets == nil {
-			return nil
-		}
-
-		delete(kf.Targets, target)
-		return nil
-	})
-}
-
 func (w WorkDir) AddTarget(target string, folderName string, dep KloneSource) error {
 	return w.editKloneFile(func(kf *kloneFile) error {
 		if kf.Targets == nil {
