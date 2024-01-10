@@ -8,13 +8,15 @@ import (
 	"github.com/cert-manager/klone/pkg/cache"
 	"github.com/cert-manager/klone/pkg/download/git"
 	"github.com/cert-manager/klone/pkg/mod"
+
 	"github.com/spf13/cobra"
 )
 
 func NewSyncCommand() *cobra.Command {
 	cmds := &cobra.Command{
-		Use:  "sync",
-		Args: cobra.ExactArgs(0),
+		Use:   "sync",
+		Short: "Ensure the local state of targets matches upstream",
+		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workDirPath, err := filepath.Abs(".")
 			if err != nil {
