@@ -8,13 +8,15 @@ import (
 	"github.com/cert-manager/klone/pkg/cache"
 	"github.com/cert-manager/klone/pkg/download/git"
 	"github.com/cert-manager/klone/pkg/mod"
+
 	"github.com/spf13/cobra"
 )
 
 func NewUpgradeCommand() *cobra.Command {
 	cmds := &cobra.Command{
-		Use:  "upgrade",
-		Args: cobra.ExactArgs(0),
+		Use:   "upgrade",
+		Args:  cobra.ExactArgs(0),
+		Short: "Update all hashes to the latest upstream available and sync",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workDirPath, err := filepath.Abs(".")
 			if err != nil {
