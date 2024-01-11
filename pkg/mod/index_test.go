@@ -3,7 +3,7 @@ package mod
 import (
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"testing"
 )
 
@@ -16,8 +16,8 @@ func TestKloneItemSorting(t *testing.T) {
 	}
 
 	// Sort the items
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Less(items[j])
+	slices.SortFunc(items, func(a, b KloneItem) int {
+		return a.Compare(b)
 	})
 
 	// Verify the sorting order
@@ -57,6 +57,82 @@ targets:
 targets:
   target1:
     - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+`,
+			expectErr: false,
+		},
+		{
+			name: "Sort targets (level 1)",
+			initial: `# Test comment1
+# Test comment2
+targets:
+  target2:
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+  target1:
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+`,
+			modifyFn: func(kf *kloneFile) error {
+				return nil
+			},
+			expected: `# Test comment1
+# Test comment2
+targets:
+  target1:
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+  target2:
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+`,
+			expectErr: false,
+		},
+		{
+			name: "Sort targets (level 2)",
+			initial: `# Test comment1
+# Test comment2
+targets:
+  target1:
+    - folder_name: Folder B
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+`,
+			modifyFn: func(kf *kloneFile) error {
+				return nil
+			},
+			expected: `# Test comment1
+# Test comment2
+targets:
+  target1:
+    - folder_name: Folder A
+      repo_url: https://github.com/repo1
+      repo_ref: main
+      repo_hash: abc123
+      repo_path: path/to/repo1
+    - folder_name: Folder B
       repo_url: https://github.com/repo1
       repo_ref: main
       repo_hash: abc123
