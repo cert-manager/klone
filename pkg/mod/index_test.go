@@ -41,6 +41,7 @@ func Test_editKloneFile(t *testing.T) {
 			name: "Preserve comments",
 			initial: `# Test comment1
 # Test comment2
+
 targets:
   target1:
     - folder_name: Folder A
@@ -54,6 +55,7 @@ targets:
 			},
 			expected: `# Test comment1
 # Test comment2
+
 targets:
   target1:
     - folder_name: Folder A
@@ -68,6 +70,7 @@ targets:
 			name: "Sort targets (level 1)",
 			initial: `# Test comment1
 # Test comment2
+
 targets:
   target2:
     - folder_name: Folder A
@@ -87,6 +90,7 @@ targets:
 			},
 			expected: `# Test comment1
 # Test comment2
+
 targets:
   target1:
     - folder_name: Folder A
@@ -107,6 +111,7 @@ targets:
 			name: "Sort targets (level 2)",
 			initial: `# Test comment1
 # Test comment2
+
 targets:
   target1:
     - folder_name: Folder B
@@ -125,6 +130,7 @@ targets:
 			},
 			expected: `# Test comment1
 # Test comment2
+
 targets:
   target1:
     - folder_name: Folder A

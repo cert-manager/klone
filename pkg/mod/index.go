@@ -1,7 +1,6 @@
 package mod
 
 import (
-	"bufio"
 	"io"
 	"path/filepath"
 	"slices"
@@ -72,16 +71,23 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 	if err != nil {
 		return err
 	}
+
 	defer file.Close()
 
-	index := kloneFile{}
+	var rawDocument yaml.Node
 
 	// decode current contents of index file
-	if err := yaml.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
+	if err := yaml.NewDecoder(file).Decode(&rawDocument); err != nil && err != io.EOF {
 		return err
 	}
 
-	// canonicalize index
+	index := kloneFile{}
+
+	err = rawDocument.Decode(&index)
+	if err != nil {
+		return err
+	}
+
 	index.canonicalize()
 
 	// update index
@@ -89,47 +95,7 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 		return err
 	}
 
-	// canonicalize index
 	index.canonicalize()
-
-	topComments := ""
-
-	{
-		// go back to the beginning of the file
-		if _, err := file.Seek(0, 0); err != nil {
-			return err
-		}
-
-		comments := strings.Builder{}
-
-		// read lines until the first non-comment line
-		reader := bufio.NewReader(file)
-		for {
-			line, isPrefix, err := reader.ReadLine()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return err
-			}
-
-			if !isPrefix && (len(line) > 0 && line[0] != '#') {
-				break
-			}
-
-			if _, err := comments.Write(line); err != nil {
-				return err
-			}
-
-			if !isPrefix {
-				if _, err := comments.WriteRune('\n'); err != nil {
-					return err
-				}
-			}
-		}
-
-		topComments = comments.String()
-	}
 
 	// truncate file
 	if _, err := file.Seek(0, 0); err != nil {
@@ -139,9 +105,9 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 		return err
 	}
 
-	// write comments
-	if _, err := file.WriteString(topComments); err != nil {
-		return err
+	trimmedHeadComment := strings.TrimSpace(rawDocument.HeadComment)
+	if len(trimmedHeadComment) > 0 {
+		_, _ = file.WriteString(trimmedHeadComment + "\n\n")
 	}
 
 	encoder := yaml.NewEncoder(file)
@@ -149,6 +115,11 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 
 	if err := encoder.Encode(index); err != nil {
 		return err
+	}
+
+	trimmedFootComment := strings.TrimSpace(rawDocument.FootComment)
+	if len(trimmedFootComment) > 0 {
+		_, _ = file.WriteString("\n\n" + trimmedFootComment)
 	}
 
 	return nil
