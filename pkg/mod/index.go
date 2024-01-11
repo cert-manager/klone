@@ -73,6 +73,9 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 		reader := bufio.NewReader(file)
 		for {
 			line, isPrefix, err := reader.ReadLine()
+			if err == io.EOF {
+				break
+			}
 			if err != nil {
 				return err
 			}
