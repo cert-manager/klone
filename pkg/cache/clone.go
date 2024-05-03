@@ -12,7 +12,7 @@ import (
 )
 
 func calculateCacheKey(src mod.KloneSource) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", src.RepoURL, src.RepoHash, src.RepoPath))))[:30]
+	return fmt.Sprintf("cache-%x", sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", src.RepoURL, src.RepoHash, src.RepoPath))))[:30]
 }
 
 func getCacheDir() (string, error) {
@@ -28,14 +28,6 @@ func getCacheDir() (string, error) {
 	return filepath.Abs(filepath.Clean(filepath.Join(home, ".cache", "klone")))
 }
 
-func getTempDir() (string, error) {
-	if tempDir := os.Getenv("KLONE_TEMP_DIR"); tempDir != "" {
-		return filepath.Abs(filepath.Clean(tempDir))
-	}
-
-	return os.TempDir(), nil
-}
-
 func CloneWithCache(
 	destPath string,
 	src mod.KloneSource,
@@ -46,17 +38,16 @@ func CloneWithCache(
 		return err
 	}
 
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return err
+	}
+
 	cachePath := filepath.Join(cacheDir, calculateCacheKey(src))
 
 	if _, err := os.Stat(cachePath); err != nil && !os.IsNotExist(err) {
 		return err
 	} else if err != nil {
-		tmpParentDir, err := getTempDir()
-		if err != nil {
-			return err
-		}
-
-		tempDir, err := os.MkdirTemp(tmpParentDir, "klone-*")
+		tempDir, err := os.MkdirTemp(cacheDir, "temp-*")
 		if err != nil {
 			return err
 		}
