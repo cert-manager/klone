@@ -3,12 +3,13 @@ package cache
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/cert-manager/klone/pkg/mod"
-	cp "github.com/otiai10/copy"
 )
 
 func calculateCacheKey(src mod.KloneSource) string {
@@ -77,16 +78,32 @@ func CloneWithCache(
 		return err
 	}
 
-	if err := os.RemoveAll(destPath); err != nil {
+	if err := os.MkdirAll(destPath, 0755); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	if err := runRsyncCmd(cachePath, os.Stdout, os.Stderr, "-aEq", ".", destPath); err != nil {
 		return err
 	}
 
-	if err := cp.Copy(cachePath, destPath); err != nil {
+	return nil
+}
+
+func runRsyncCmd(root string, stdout io.Writer, stderr io.Writer, args ...string) error {
+	cmd := exec.Command("rsync", args...)
+
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), cmd.Env...)
+
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	if err := cmd.Start(); err != nil {
 		return err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("rsync command failed: %v", err)
 	}
 
 	return nil
