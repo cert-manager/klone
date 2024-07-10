@@ -154,29 +154,6 @@ func (w WorkDir) editKloneFile(fn func(*kloneFile) error) error {
 	return nil
 }
 
-func (w WorkDir) readKloneFile() (*kloneFile, error) {
-	kloneFilePath := filepath.Join(string(w), kloneFileName)
-
-	// exclusively open or create index file
-	file, err := lockedfile.Open(kloneFilePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	index := kloneFile{}
-
-	// decode current contents of index file
-	if err := yaml.NewDecoder(file).Decode(&index); err != nil && err != io.EOF {
-		return nil, err
-	}
-
-	// canonicalize index
-	index.canonicalize()
-
-	return &index, nil
-}
-
 func (w WorkDir) Init() error {
 	return w.editKloneFile(func(kf *kloneFile) error {
 		return nil
@@ -185,9 +162,10 @@ func (w WorkDir) Init() error {
 
 func (w WorkDir) AddTarget(target string, folderName string, dep KloneSource) error {
 	return w.editKloneFile(func(kf *kloneFile) error {
-		for _, src := range kf.Targets[target] {
+		for targetFolder, src := range kf.Targets[target] {
 			if src.FolderName == folderName {
 				src.KloneSource = dep
+				kf.Targets[target][targetFolder] = src
 				return nil
 			}
 		}
