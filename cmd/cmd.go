@@ -18,7 +18,7 @@ which does nothing.
 
 To add a target for kloning, use "klone add", e.g.:
 
-klone add example myfolder https://github.com/cert-manager/community.git main logo
+klone add example myfolder https://github.com/cert-manager/community.git logo main
 
 This will add an entry to klone.yaml which fetches the latest cert-manager
 logo from the community repo and stores it in example/myfolder.
