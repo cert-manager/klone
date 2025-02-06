@@ -8,6 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/cenkalti/backoff/v5"
 
 	"github.com/cert-manager/klone/pkg/mod"
 )
@@ -24,26 +28,54 @@ func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, e
 	return filepath.Join(targetPath, src.RepoPath), nil
 }
 
+const gitRetryDelay = 5 * time.Second
+
 func runGitCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	do := func() (struct{}, error) {
+		// dummy return value to match the interface of backoff.Operation
+		ret := struct{}{}
 
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), cmd.Env...)
-	// Disable Git terminal prompts in case we're running with a tty
-	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=false")
+		cmd := exec.CommandContext(ctx, "git", args...)
 
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), cmd.Env...)
+		// Disable Git terminal prompts in case we're running with a tty
+		cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=false")
 
-	if err := cmd.Start(); err != nil {
-		return err
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+
+		if err := cmd.Start(); err != nil {
+			return ret, err
+		}
+
+		if err := cmd.Wait(); err != nil {
+			return ret, fmt.Errorf("git command failed: %v", err)
+		}
+
+		return ret, nil
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("git command failed: %v", err)
+	_, err := backoff.Retry(ctx, do, backoff.WithMaxTries(getRetryCount()), backoff.WithBackOff(backoff.NewConstantBackOff(gitRetryDelay)))
+	return err
+}
+
+func getRetryCount() uint {
+	retryCountRaw := os.Getenv("KLONE_GIT_RETRY_ATTEMPTS")
+	if retryCountRaw == "" {
+		return 1
 	}
 
-	return nil
+	retryCount, err := strconv.Atoi(retryCountRaw)
+	if err != nil {
+		return 1
+	}
+
+	if retryCount <= 0 {
+		return 1
+	}
+
+	return uint(retryCount)
 }
 
 func sparseCheckout(ctx context.Context, root string, repoURL string, branch string, patterns []string) error {
