@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -41,7 +43,8 @@ signs:
 
 archives:
   - name_template: "{{.Binary}}_{{.Os}}_{{.Arch}}"
-    format: binary
+    formats:
+      - binary
 
 changelog:
   sort: asc
