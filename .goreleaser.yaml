@@ -49,3 +49,4 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^devel:'
