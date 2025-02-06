@@ -18,18 +18,26 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - id: goreleaser-version
+        run: |
+          make print-goreleaser-version >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
-      - uses: actions/setup-go@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: 1.21
+          go-version: stable
           cache: true
+
       - uses: sigstore/cosign-installer@v3.1.2         # installs cosign
+
       - uses: anchore/sbom-action/download-syft@v0.14.3 # installs syft
+
       - uses: goreleaser/goreleaser-action@v5          # run goreleaser
         with:
-          version: latest
+          version: ${{ steps.goreleaser-version.outputs.goreleaser_version }}
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
