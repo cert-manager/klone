@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,14 +11,14 @@ import (
 	"github.com/cert-manager/klone/pkg/mod"
 )
 
-func SyncFolder(workDirPath string, forceUpgrade bool) error {
+func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) error {
 	wrkDir := mod.WorkDir(workDirPath)
 	if err := wrkDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
 			src.RepoPath = filepath.Join(".", filepath.Clean(filepath.Join("/", src.RepoPath)))
 
 			if src.RepoHash == "" || forceUpgrade {
-				hash, err := git.GetHash(src.RepoURL, src.RepoRef)
+				hash, err := git.GetHash(ctx, src.RepoURL, src.RepoRef)
 				if err != nil {
 					return err
 				}
@@ -44,7 +45,7 @@ func SyncFolder(workDirPath string, forceUpgrade bool) error {
 
 			// 2) Sync all folders with cached files
 			for _, src := range srcs {
-				if err := cache.CloneWithCache(filepath.Join(workDirPath, target, src.FolderName), src.KloneSource, git.Get); err != nil {
+				if err := cache.CloneWithCache(ctx, filepath.Join(workDirPath, target, src.FolderName), src.KloneSource, git.Get); err != nil {
 					return err
 				}
 			}

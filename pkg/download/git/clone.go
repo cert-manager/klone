@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,18 +14,18 @@ import (
 
 type cleanup func()
 
-func Get(targetPath string, src mod.KloneSource) (string, error) {
+func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, error) {
 	fmt.Println("Cloning", src.RepoPath, " from ", src.RepoURL, "to", targetPath, "on commit", src.RepoHash)
 
-	if err := sparseCheckout(targetPath, src.RepoURL, src.RepoHash, []string{src.RepoPath}); err != nil {
+	if err := sparseCheckout(ctx, targetPath, src.RepoURL, src.RepoHash, []string{src.RepoPath}); err != nil {
 		return "", err
 	}
 
 	return filepath.Join(targetPath, src.RepoPath), nil
 }
 
-func runGitCmd(root string, stdout io.Writer, stderr io.Writer, args ...string) error {
-	cmd := exec.Command("git", args...)
+func runGitCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
 
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), cmd.Env...)
@@ -45,7 +46,7 @@ func runGitCmd(root string, stdout io.Writer, stderr io.Writer, args ...string) 
 	return nil
 }
 
-func sparseCheckout(root string, repoURL string, branch string, patterns []string) error {
+func sparseCheckout(ctx context.Context, root string, repoURL string, branch string, patterns []string) error {
 	if err := os.RemoveAll(root); err != nil {
 		return fmt.Errorf("unable to clean repo at %s: %v", root, err)
 	}
@@ -54,29 +55,29 @@ func sparseCheckout(root string, repoURL string, branch string, patterns []strin
 		return err
 	}
 
-	if err := runGitCmd(root, os.Stdout, os.Stderr, "clone", "--depth=1", "--filter=blob:none", "--no-checkout", repoURL, "."); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "clone", "--depth=1", "--filter=blob:none", "--no-checkout", repoURL, "."); err != nil {
 		return err
 	}
 
-	if err := runGitCmd(root, os.Stdout, os.Stderr, "config", "advice.detachedHead", "false"); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "config", "advice.detachedHead", "false"); err != nil {
 		return err
 	}
 
-	if err := runGitCmd(root, os.Stdout, os.Stderr, "sparse-checkout", "init", "--cone", "--sparse-index"); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "sparse-checkout", "init", "--cone", "--sparse-index"); err != nil {
 		return err
 	}
 
 	args := append([]string{"sparse-checkout", "set"}, patterns...)
-	if err := runGitCmd(root, os.Stdout, os.Stderr, args...); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, args...); err != nil {
 		return err
 	}
 
-	if err := runGitCmd(root, os.Stdout, os.Stderr, "checkout", branch); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "checkout", branch); err != nil {
 		return err
 	}
 
 	buffer := bytes.Buffer{}
-	if err := runGitCmd(root, &buffer, os.Stderr, "rev-parse", "HEAD"); err != nil {
+	if err := runGitCmd(ctx, root, &buffer, os.Stderr, "rev-parse", "HEAD"); err != nil {
 		return err
 	}
 
