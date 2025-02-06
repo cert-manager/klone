@@ -82,7 +82,7 @@ func CloneWithCache(
 		return err
 	}
 
-	if err := runRsyncCmd(cachePath, os.Stdout, os.Stderr, "-aEq", ".", destPath); err != nil {
+	if err := runRsyncCmd(cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
 		return err
 	}
 
