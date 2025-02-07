@@ -18,7 +18,7 @@ func NewSyncCommand() *cobra.Command {
 				return err
 			}
 
-			return sync.SyncFolder(workDirPath, false)
+			return sync.SyncFolder(cmd.Context(), workDirPath, false)
 		},
 	}
 

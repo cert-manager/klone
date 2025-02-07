@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -30,16 +31,17 @@ func getCacheDir() (string, error) {
 }
 
 func CloneWithCache(
+	ctx context.Context,
 	destPath string,
 	src mod.KloneSource,
-	getFn func(targetPath string, src mod.KloneSource) (string, error),
+	getFn func(getCtx context.Context, targetPath string, src mod.KloneSource) (string, error),
 ) error {
 	cacheDir, err := getCacheDir()
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
 
@@ -54,7 +56,7 @@ func CloneWithCache(
 		}
 		defer os.RemoveAll(tempDir)
 
-		outPath, err := getFn(tempDir, src)
+		outPath, err := getFn(ctx, tempDir, src)
 		if err != nil {
 			return err
 		}
@@ -78,19 +80,19 @@ func CloneWithCache(
 		return err
 	}
 
-	if err := os.MkdirAll(destPath, 0755); err != nil {
+	if err := os.MkdirAll(destPath, 0o755); err != nil {
 		return err
 	}
 
-	if err := runRsyncCmd(cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
+	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func runRsyncCmd(root string, stdout io.Writer, stderr io.Writer, args ...string) error {
-	cmd := exec.Command("rsync", args...)
+func runRsyncCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
+	cmd := exec.CommandContext(ctx, "rsync", args...)
 
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), cmd.Env...)

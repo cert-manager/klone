@@ -18,7 +18,7 @@ func NewUpgradeCommand() *cobra.Command {
 				return err
 			}
 
-			return sync.SyncFolder(workDirPath, true)
+			return sync.SyncFolder(cmd.Context(), workDirPath, true)
 		},
 	}
 

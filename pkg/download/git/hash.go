@@ -2,13 +2,14 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 )
 
-func GetHash(repoURL string, ref string) (string, error) {
+func GetHash(ctx context.Context, repoURL string, ref string) (string, error) {
 	outBuffer := &bytes.Buffer{}
-	if err := runGitCmd(".", outBuffer, os.Stderr, "ls-remote", repoURL, ref); err != nil {
+	if err := runGitCmd(ctx, ".", outBuffer, os.Stderr, "ls-remote", repoURL, ref); err != nil {
 		return "", err
 	}
 
