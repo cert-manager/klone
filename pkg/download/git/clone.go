@@ -1,7 +1,6 @@
 package git
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/cert-manager/klone/pkg/mod"
 )
-
-type cleanup func()
 
 func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, error) {
 	fmt.Println("Cloning", src.RepoPath, " from ", src.RepoURL, "to", targetPath, "on commit", src.RepoHash)
@@ -73,11 +70,6 @@ func sparseCheckout(ctx context.Context, root string, repoURL string, branch str
 	}
 
 	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "checkout", branch); err != nil {
-		return err
-	}
-
-	buffer := bytes.Buffer{}
-	if err := runGitCmd(ctx, root, &buffer, os.Stderr, "rev-parse", "HEAD"); err != nil {
 		return err
 	}
 
