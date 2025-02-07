@@ -18,6 +18,7 @@ func calculateCacheKey(src mod.KloneSource) string {
 }
 
 func getCacheDir() (string, error) {
+	// TODO: add centralized config management defining env vars + maybe a global config file for klone
 	if cacheDir := os.Getenv("KLONE_CACHE_DIR"); cacheDir != "" {
 		return filepath.Abs(filepath.Clean(cacheDir))
 	}
