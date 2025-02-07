@@ -61,6 +61,7 @@ func runGitCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Wri
 }
 
 func getRetryCount() uint {
+	// TODO: add centralized config management defining env vars + maybe a global config file for klone
 	retryCountRaw := os.Getenv("KLONE_GIT_RETRY_ATTEMPTS")
 	if retryCountRaw == "" {
 		return 1
