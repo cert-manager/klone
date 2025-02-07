@@ -12,8 +12,8 @@ import (
 )
 
 func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) error {
-	wrkDir := mod.WorkDir(workDirPath)
-	if err := wrkDir.FetchTargets(
+	workDir := mod.WorkDir(workDirPath)
+	if err := workDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
 			src.RepoPath = filepath.Join(".", filepath.Clean(filepath.Join("/", src.RepoPath)))
 

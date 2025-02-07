@@ -25,7 +25,7 @@ community repository to the local directory ./a/b
 				return err
 			}
 
-			wrkDir := mod.WorkDir(workDirPath)
+			workDir := mod.WorkDir(workDirPath)
 
 			dstPath := args[0]
 			dstFolderName := args[1]
@@ -38,7 +38,7 @@ community repository to the local directory ./a/b
 				repoHash = args[5]
 			}
 
-			return wrkDir.AddTarget(dstPath, dstFolderName, mod.KloneSource{
+			return workDir.AddTarget(dstPath, dstFolderName, mod.KloneSource{
 				RepoURL:  repoURL,
 				RepoPath: repoPath,
 				RepoRef:  repoRef,
