@@ -19,8 +19,8 @@ func NewInitCommand() *cobra.Command {
 				return err
 			}
 
-			wrkDir := mod.WorkDir(workDirPath)
-			return wrkDir.Init()
+			workDir := mod.WorkDir(workDirPath)
+			return workDir.Init()
 		},
 	}
 
