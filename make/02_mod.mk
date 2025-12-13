@@ -15,17 +15,13 @@
 include make/test-unit.mk
 include make/test-e2e.mk
 
-# TODO: Create print-goreleaser-version target in makefile-modules
-goreleaser_version := v2.13.1
-tools := $(filter-out goreleaser=%,$(tools)) \
-         goreleaser=$(goreleaser_version)
-
 .PHONY: print-goreleaser-version
 print-goreleaser-version:
-	@echo "goreleaser_version=$(goreleaser_version)"
+	@echo "goreleaser_version=$(GORELEASER_VERSION)"
 
 .PHONY: build
 build: $(bin_dir)/klone
 
+sources := **/*.go go.mod go.sum
 $(bin_dir)/klone: $(sources) .goreleaser.yaml | $(NEEDS_GORELEASER) $(bin_dir)
 	$(GORELEASER) build --single-target --snapshot --clean --output $@

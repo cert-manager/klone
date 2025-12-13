@@ -18,4 +18,4 @@
 ## @category Testing
 .PHONY: test-e2e
 test-e2e: $(bin_dir)/klone
-	./test-e2e.sh $<
+	./make/test-e2e.sh $<
