@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Copyright 2023 The cert-manager Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-wget -O checksums.txt https://github.com/cert-manager/klone/releases/download/latest/checksums.txt
-wget -O checksums.txt.cosign.bundle https://github.com/cert-manager/klone/releases/download/latest/checksums.txt.cosign.bundle
-
-cosign verify-blob checksums.txt \
-    --bundle checksums.txt.cosign.bundle \
-    --certificate-identity=https://github.com/cert-manager/klone/.github/workflows/release.yml@refs/tags/v0.0.1-alpha.0 \
-    --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+shared_generate_targets ?=
+shared_generate_targets_dirty ?=
+shared_verify_targets ?=
+shared_verify_targets_dirty ?=

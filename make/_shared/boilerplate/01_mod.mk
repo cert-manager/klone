@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Copyright 2023 The cert-manager Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-wget -O checksums.txt https://github.com/cert-manager/klone/releases/download/latest/checksums.txt
-wget -O checksums.txt.cosign.bundle https://github.com/cert-manager/klone/releases/download/latest/checksums.txt.cosign.bundle
+license_base_dir := $(dir $(lastword $(MAKEFILE_LIST)))/base/
 
-cosign verify-blob checksums.txt \
-    --bundle checksums.txt.cosign.bundle \
-    --certificate-identity=https://github.com/cert-manager/klone/.github/workflows/release.yml@refs/tags/v0.0.1-alpha.0 \
-    --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+.PHONY: verify-boilerplate
+## Verify that all files have the correct boilerplate.
+## @category [shared] Generate/ Verify
+verify-boilerplate: | $(NEEDS_BOILERSUITE)
+	$(BOILERSUITE) .
+
+shared_verify_targets += verify-boilerplate
+
+.PHONY: generate-license
+## Generate LICENSE file in the repository
+## @category [shared] Generate/ Verify
+generate-license:
+	cp -r $(license_base_dir)/. ./
+
+shared_generate_targets += generate-license

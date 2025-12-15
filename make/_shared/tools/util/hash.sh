@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Copyright 2023 The cert-manager Authors.
 #
@@ -14,10 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-wget -O checksums.txt https://github.com/cert-manager/klone/releases/download/latest/checksums.txt
-wget -O checksums.txt.cosign.bundle https://github.com/cert-manager/klone/releases/download/latest/checksums.txt.cosign.bundle
+set -o errexit
+set -o nounset
+set -o pipefail
 
-cosign verify-blob checksums.txt \
-    --bundle checksums.txt.cosign.bundle \
-    --certificate-identity=https://github.com/cert-manager/klone/.github/workflows/release.yml@refs/tags/v0.0.1-alpha.0 \
-    --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+# This script is a wrapper for outputting purely the sha256 hash of the input file,
+# ideally in a portable way.
+
+case "$(uname -s)" in
+    Darwin*)    shasum -a 256 "$1";;
+    *)          sha256sum "$1" 
+esac | cut -d" " -f1

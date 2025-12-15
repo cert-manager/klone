@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Copyright 2023 The cert-manager Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-wget -O checksums.txt https://github.com/cert-manager/klone/releases/download/latest/checksums.txt
-wget -O checksums.txt.cosign.bundle https://github.com/cert-manager/klone/releases/download/latest/checksums.txt.cosign.bundle
+include make/test-unit.mk
+include make/test-e2e.mk
 
-cosign verify-blob checksums.txt \
-    --bundle checksums.txt.cosign.bundle \
-    --certificate-identity=https://github.com/cert-manager/klone/.github/workflows/release.yml@refs/tags/v0.0.1-alpha.0 \
-    --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+# TODO: Create print-goreleaser-version target in makefile-modules
+goreleaser_version := v2.13.1
+tools := $(filter-out goreleaser=%,$(tools)) \
+         goreleaser=$(goreleaser_version)
+
+.PHONY: print-goreleaser-version
+print-goreleaser-version:
+	@echo "goreleaser_version=$(goreleaser_version)"
+
+.PHONY: build
+build: $(bin_dir)/klone
+
+$(bin_dir)/klone: $(sources) .goreleaser.yaml | $(NEEDS_GORELEASER) $(bin_dir)
+	$(GORELEASER) build --single-target --snapshot --clean --output $@
