@@ -12,18 +12,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      - id: go-version
+        run: |
+          make print-go-version >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
-          go-version: stable
-          cache: true
+          go-version: ${{ steps.go-version.outputs.result }}
+
       - run: make test
 
   e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      - id: go-version
+        run: |
+          make print-go-version >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
-          go-version: stable
-          cache: true
+          go-version: ${{ steps.go-version.outputs.result }}
+
       - run: make test-e2e
