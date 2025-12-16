@@ -18,7 +18,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
 
@@ -34,11 +34,11 @@ jobs:
         with:
           go-version: ${{ steps.go-version.outputs.result }}
 
-      - uses: sigstore/cosign-installer@v3.1.2         # installs cosign
+      - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0         # installs cosign
 
       - uses: anchore/sbom-action/download-syft@v0.14.3 # installs syft
 
-      - uses: goreleaser/goreleaser-action@v5          # run goreleaser
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6          # run goreleaser
         with:
           version: ${{ steps.goreleaser-version.outputs.goreleaser_version }}
           args: release --clean
