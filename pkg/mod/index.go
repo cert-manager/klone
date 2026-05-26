@@ -18,6 +18,7 @@ package mod
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"path/filepath"
 	"slices"
@@ -197,6 +198,49 @@ func (w WorkDir) AddTarget(target string, folderName string, dep KloneSource) er
 
 func cleanRelativePath(src string) string {
 	return filepath.Join(".", filepath.Clean(filepath.Join("/", src)))
+}
+
+// ValidateRepoURL rejects repo_url values that could be re-interpreted by git
+// as a command-line option or as a request to spin up an arbitrary helper
+// transport (e.g. ext::sh -c …). It is intentionally strict — only schemes
+// klone actually needs to clone from are accepted. See VC-53817.
+func ValidateRepoURL(repoURL string) error {
+	if repoURL == "" {
+		return fmt.Errorf("repo_url is empty")
+	}
+	// A leading '-' would be parsed by git as an option even with `--` in
+	// the argv (some git subcommands look at the first non-option as
+	// `--upload-pack=…` etc. when other flags appear earlier). Reject
+	// outright — no legitimate URL starts with '-'.
+	if strings.HasPrefix(repoURL, "-") {
+		return fmt.Errorf("repo_url %q starts with '-', refusing to pass it to git", repoURL)
+	}
+	// Reject any helper transport other than the well-known network/local
+	// schemes. `ext::`, `transport_helper::`, etc. all match
+	// `<word>::<command>` — disallow the `::` shape entirely.
+	if strings.Contains(repoURL, "::") {
+		return fmt.Errorf("repo_url %q uses a helper transport ('::'), which is not allowed", repoURL)
+	}
+	// Allow-list the schemes we expect. We accept:
+	//   - https://, http://, ssh://, git://, file://     (URL form)
+	//   - user@host:path                                 (scp-like ssh form)
+	//   - /absolute/local/path                           (local clone path)
+	switch {
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"),
+		strings.HasPrefix(repoURL, "ssh://"),
+		strings.HasPrefix(repoURL, "git://"),
+		strings.HasPrefix(repoURL, "file://"),
+		strings.HasPrefix(repoURL, "/"):
+		return nil
+	}
+	// scp-like form: <user>@<host>:<path>. Require an '@' before the first ':'.
+	if at := strings.Index(repoURL, "@"); at > 0 {
+		if colon := strings.Index(repoURL, ":"); colon > at {
+			return nil
+		}
+	}
+	return fmt.Errorf("repo_url %q does not use an allowed scheme (https/http/ssh/git/file/local path/scp-like)", repoURL)
 }
 
 func (w WorkDir) FetchTargets(

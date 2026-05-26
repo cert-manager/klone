@@ -44,11 +44,20 @@ func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, e
 const gitRetryDelay = 5 * time.Second
 
 func runGitCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
+	// Hardening (VC-53817): top-level `-c` flags must come before the
+	// subcommand. Pin the protocol policy to reject `ext::` and any other
+	// non-vetted helper transport, regardless of the host's git config.
+	// `file://` is left at git's default so legitimate local-path repos
+	// (e.g. in tests) still work.
+	hardened := append([]string{
+		"-c", "protocol.ext.allow=never",
+	}, args...)
+
 	do := func() (struct{}, error) {
 		// dummy return value to match the interface of backoff.Operation
 		ret := struct{}{}
 
-		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd := exec.CommandContext(ctx, "git", hardened...)
 
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), cmd.Env...)
@@ -101,7 +110,7 @@ func sparseCheckout(ctx context.Context, root string, repoURL string, branch str
 		return err
 	}
 
-	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "clone", "--depth=1", "--filter=blob:none", "--no-checkout", repoURL, "."); err != nil {
+	if err := runGitCmd(ctx, root, os.Stdout, os.Stderr, "clone", "--depth=1", "--filter=blob:none", "--no-checkout", "--", repoURL, "."); err != nil {
 		return err
 	}
 
