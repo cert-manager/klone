@@ -44,11 +44,6 @@ func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, e
 const gitRetryDelay = 5 * time.Second
 
 func runGitCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
-	// Hardening (VC-53817): top-level `-c` flags must come before the
-	// subcommand. Pin the protocol policy to reject `ext::` and any other
-	// non-vetted helper transport, regardless of the host's git config.
-	// `file://` is left at git's default so legitimate local-path repos
-	// (e.g. in tests) still work.
 	hardened := append([]string{
 		"-c", "protocol.ext.allow=never",
 	}, args...)

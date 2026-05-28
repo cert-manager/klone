@@ -31,9 +31,6 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 	workDir := mod.WorkDir(workDirPath)
 	if err := workDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
-			// VC-53817: reject manifest-supplied repo_url values that could
-			// be interpreted as a git option or as a request to launch an
-			// arbitrary helper transport. Done before any git invocation.
 			if err := mod.ValidateRepoURL(src.RepoURL); err != nil {
 				return err
 			}
