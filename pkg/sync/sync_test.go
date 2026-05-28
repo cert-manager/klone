@@ -23,11 +23,25 @@ import (
 	"testing"
 )
 
+// skipIfNoSymlinks probes whether the current process/OS can create a
+// symlink and skips the test if it cannot. Windows without Developer Mode
+// (or sandboxed CI without the symlink privilege) returns EPERM/ENOTSUP
+// from os.Symlink, which would otherwise mask the real assertion under a
+// setup failure.
+func skipIfNoSymlinks(t *testing.T) {
+	t.Helper()
+	probe := t.TempDir()
+	if err := os.Symlink(probe, filepath.Join(probe, "probe")); err != nil {
+		t.Skipf("skip: symlinks unsupported in this environment: %v", err)
+	}
+}
+
 // TestSyncFolder_TargetSymlinkRejected is the regression for the VC-53816
 // root-symlink variant: when the target directory itself (e.g. `vendored`)
 // is a pre-planted symlink to an attacker-chosen location, SyncFolder must
 // refuse rather than letting Cleanup/MkdirAll/rsync dereference it.
 func TestSyncFolder_TargetSymlinkRejected(t *testing.T) {
+	skipIfNoSymlinks(t)
 	sb := t.TempDir()
 	workDir := filepath.Join(sb, "project")
 	decoy := filepath.Join(sb, "decoy")

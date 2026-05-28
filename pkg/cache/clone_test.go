@@ -23,7 +23,21 @@ import (
 	"testing"
 )
 
+// skipIfNoSymlinks probes whether the current process/OS can create a
+// symlink and skips the test if it cannot. Windows without Developer Mode
+// (or sandboxed CI without the symlink privilege) returns EPERM/ENOTSUP
+// from os.Symlink, which would otherwise mask the real assertion under a
+// setup failure.
+func skipIfNoSymlinks(t *testing.T) {
+	t.Helper()
+	probe := t.TempDir()
+	if err := os.Symlink(probe, filepath.Join(probe, "probe")); err != nil {
+		t.Skipf("skip: symlinks unsupported in this environment: %v", err)
+	}
+}
+
 func TestAssertNoSymlinkInSubpath(t *testing.T) {
+	skipIfNoSymlinks(t)
 	root := t.TempDir()
 
 	// Layout:
@@ -66,6 +80,21 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 		// to run independently of the Lstat walk's IsNotExist short-circuit.
 		{name: "traversal after non-existent", subpath: "fresh/../etc", wantErr: true, errMatch: "traversal"},
 		{name: "empty segment after non-existent", subpath: "fresh//etc", wantErr: true, errMatch: "empty"},
+
+		// filepath.Join silently drops root when joined with any of these
+		// on Windows, so they must be rejected regardless of build GOOS.
+		{name: "absolute unix path", subpath: "/etc/passwd", wantErr: true, errMatch: "relative"},
+		{name: "windows drive letter", subpath: `C:\Windows`, wantErr: true, errMatch: "relative"},
+		{name: "windows drive forward slash", subpath: "C:/Windows", wantErr: true, errMatch: "relative"},
+		{name: "windows drive only", subpath: "C:", wantErr: true, errMatch: "relative"},
+		// UNC: rejected as absolute on Windows, as empty leading segments
+		// on POSIX (after backslash→slash normalisation). Both routes
+		// return "invalid subpath %q: ..." so we match the common prefix.
+		{name: "unc path", subpath: `\\server\share\x`, wantErr: true, errMatch: "invalid subpath"},
+
+		// Backslash-separated traversal must be caught on every GOOS, not
+		// only on Windows where filepath.ToSlash would normalise it.
+		{name: "backslash traversal", subpath: `a\..\etc`, wantErr: true, errMatch: "traversal"},
 	}
 
 	for _, tt := range tests {

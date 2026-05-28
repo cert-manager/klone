@@ -139,7 +139,11 @@ func AssertNoSymlinkInSubpath(root, subpath string) error {
 	if subpath == "" || subpath == "." {
 		return nil
 	}
-	segments := strings.Split(filepath.ToSlash(subpath), "/")
+	if filepath.IsAbs(subpath) || filepath.VolumeName(subpath) != "" || hasWindowsDrivePrefix(subpath) {
+		return fmt.Errorf("invalid subpath %q: must be relative without volume or drive prefix", subpath)
+	}
+	normalised := strings.ReplaceAll(subpath, "\\", "/")
+	segments := strings.Split(normalised, "/")
 
 	// Pass 1: pure-string validation of every segment, independent of filesystem state.
 	for _, seg := range segments {
@@ -165,6 +169,21 @@ func AssertNoSymlinkInSubpath(root, subpath string) error {
 		}
 	}
 	return nil
+}
+
+// hasWindowsDrivePrefix reports whether p begins with a Windows drive
+// designator like "C:" or "C:\foo". filepath.VolumeName on non-Windows
+// returns "" for these inputs, so we detect them explicitly to keep the
+// rejection symmetric across GOOS.
+func hasWindowsDrivePrefix(p string) bool {
+	if len(p) < 2 {
+		return false
+	}
+	c := p[0]
+	if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+		return false
+	}
+	return p[1] == ':'
 }
 
 func runRsyncCmd(ctx context.Context, root string, stdout io.Writer, stderr io.Writer, args ...string) error {
