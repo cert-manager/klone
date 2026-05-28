@@ -112,7 +112,7 @@ func CloneWithCache(
 		return err
 	}
 
-	// The primary VC-53816 defence is assertNoSymlinkInSubpath above; it
+	// The primary VC-53816 defence is AssertNoSymlinkInSubpath above; it
 	// refuses to traverse a planted symlink on the next sync. Adding
 	// --safe-links here would also drop unsafe symlinks at copy time on
 	// GNU rsync >= 3, but openrsync (the default on macOS) errors out
@@ -130,16 +130,28 @@ func CloneWithCache(
 // Non-existent components are treated as a clean tail (we'll create them
 // shortly with os.MkdirAll). root itself is assumed trusted and is not
 // inspected; the caller is responsible for picking a root they control.
+//
+// Validation runs in two passes so the string-shape check is not
+// short-circuited by an earlier non-existent component. Without this,
+// inputs like "fresh/../etc" would pass — iter 0 ("fresh") hits IsNotExist
+// and returns nil before iter 1 (the "..") is ever inspected.
 func AssertNoSymlinkInSubpath(root, subpath string) error {
 	if subpath == "" || subpath == "." {
 		return nil
 	}
 	segments := strings.Split(filepath.ToSlash(subpath), "/")
-	cur := root
+
+	// Pass 1: pure-string validation of every segment, independent of filesystem state.
 	for _, seg := range segments {
 		if seg == "" || seg == "." || seg == ".." {
 			return fmt.Errorf("invalid subpath %q: contains empty or traversal segment", subpath)
 		}
+	}
+
+	// Pass 2: Lstat walk for the prefix that exists; non-existent tails
+	// will be created by MkdirAll a moment later.
+	cur := root
+	for _, seg := range segments {
 		cur = filepath.Join(cur, seg)
 		info, err := os.Lstat(cur)
 		if err != nil {

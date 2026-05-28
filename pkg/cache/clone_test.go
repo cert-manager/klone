@@ -61,6 +61,11 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 		// Traversal segments should be rejected outright (defense in depth).
 		{name: "traversal", subpath: "a/../etc", wantErr: true, errMatch: "traversal"},
 		{name: "lone dotdot", subpath: "..", wantErr: true, errMatch: "traversal"},
+		// Traversal must still be rejected when it follows a segment that
+		// does not yet exist on disk — the pure-string validation pass has
+		// to run independently of the Lstat walk's IsNotExist short-circuit.
+		{name: "traversal after non-existent", subpath: "fresh/../etc", wantErr: true, errMatch: "traversal"},
+		{name: "empty segment after non-existent", subpath: "fresh//etc", wantErr: true, errMatch: "empty"},
 	}
 
 	for _, tt := range tests {
