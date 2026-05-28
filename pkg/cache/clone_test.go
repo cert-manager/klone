@@ -48,10 +48,11 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "a", "b"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.Symlink("/tmp", filepath.Join(root, "sym")); err != nil {
+	linkTarget := filepath.Join(root, "a", "b")
+	if err := os.Symlink(linkTarget, filepath.Join(root, "sym")); err != nil {
 		t.Fatalf("symlink: %v", err)
 	}
-	if err := os.Symlink("/tmp", filepath.Join(root, "a", "blink")); err != nil {
+	if err := os.Symlink(linkTarget, filepath.Join(root, "a", "blink")); err != nil {
 		t.Fatalf("symlink: %v", err)
 	}
 

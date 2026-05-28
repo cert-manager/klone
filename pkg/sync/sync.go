@@ -28,6 +28,16 @@ import (
 )
 
 func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) error {
+	// AssertNoSymlinkInSubpath treats workDirPath as a trusted root and
+	// does not inspect it. Resolve symlinks once up-front so a caller
+	// invoking klone from inside a symlinked path cannot shift the trust
+	// boundary above the intended directory.
+	resolved, err := filepath.EvalSymlinks(workDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve workDir %q: %w", workDirPath, err)
+	}
+	workDirPath = resolved
+
 	workDir := mod.WorkDir(workDirPath)
 	if err := workDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
