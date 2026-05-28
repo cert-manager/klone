@@ -1,0 +1,84 @@
+/*
+Copyright 2026 The cert-manager Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cache
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestAssertNoSymlinkInSubpath(t *testing.T) {
+	root := t.TempDir()
+
+	// Layout:
+	//   root/a               (regular dir)
+	//   root/a/b             (regular dir)
+	//   root/sym -> /tmp     (symlink)
+	//   root/a/blink -> /tmp (symlink as final component)
+	if err := os.MkdirAll(filepath.Join(root, "a", "b"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.Symlink("/tmp", filepath.Join(root, "sym")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	if err := os.Symlink("/tmp", filepath.Join(root, "a", "blink")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		subpath  string
+		wantErr  bool
+		errMatch string
+	}{
+		{name: "empty subpath", subpath: "", wantErr: false},
+		{name: "dot subpath", subpath: ".", wantErr: false},
+		{name: "all regular dirs", subpath: "a/b", wantErr: false},
+		{name: "non-existent leaf", subpath: "a/b/new", wantErr: false},
+		{name: "non-existent intermediate", subpath: "fresh/leaf", wantErr: false},
+
+		// VC-53816 cases.
+		{name: "symlink at root", subpath: "sym", wantErr: true, errMatch: "symlink"},
+		{name: "symlink as intermediate", subpath: "sym/anything", wantErr: true, errMatch: "symlink"},
+		{name: "symlink as final", subpath: "a/blink", wantErr: true, errMatch: "symlink"},
+
+		// Traversal segments should be rejected outright (defense in depth).
+		{name: "traversal", subpath: "a/../etc", wantErr: true, errMatch: "traversal"},
+		{name: "lone dotdot", subpath: "..", wantErr: true, errMatch: "traversal"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := AssertNoSymlinkInSubpath(root, tt.subpath)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("AssertNoSymlinkInSubpath(root, %q) = nil, want error", tt.subpath)
+					return
+				}
+				if tt.errMatch != "" && !strings.Contains(err.Error(), tt.errMatch) {
+					t.Errorf("error %q does not contain %q", err.Error(), tt.errMatch)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("AssertNoSymlinkInSubpath(root, %q) returned unexpected error: %v", tt.subpath, err)
+			}
+		})
+	}
+}

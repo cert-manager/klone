@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cert-manager/klone/pkg/mod"
@@ -49,10 +50,20 @@ func getCacheDir() (string, error) {
 
 func CloneWithCache(
 	ctx context.Context,
-	destPath string,
+	destRoot string,
+	destSubpath string,
 	src mod.KloneSource,
 	getFn func(getCtx context.Context, targetPath string, src mod.KloneSource) (string, error),
 ) error {
+	// VC-53816: refuse to traverse symlinks while resolving destSubpath
+	// underneath destRoot. A previous sync entry may have rsync'd an
+	// attacker-controlled symlink into an intermediate component; following
+	// it through os.MkdirAll + rsync would write outside destRoot.
+	if err := AssertNoSymlinkInSubpath(destRoot, destSubpath); err != nil {
+		return err
+	}
+	destPath := filepath.Join(destRoot, destSubpath)
+
 	cacheDir, err := getCacheDir()
 	if err != nil {
 		return err
@@ -101,10 +112,46 @@ func CloneWithCache(
 		return err
 	}
 
+	// The primary VC-53816 defence is assertNoSymlinkInSubpath above; it
+	// refuses to traverse a planted symlink on the next sync. Adding
+	// --safe-links here would also drop unsafe symlinks at copy time on
+	// GNU rsync >= 3, but openrsync (the default on macOS) errors out
+	// rather than skipping them, which breaks cross-platform behaviour.
+	// Tracked as a follow-up hardening.
 	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// AssertNoSymlinkInSubpath walks each component of subpath relative to root
+// and returns an error if any cumulative path exists and is a symlink.
+// Non-existent components are treated as a clean tail (we'll create them
+// shortly with os.MkdirAll). root itself is assumed trusted and is not
+// inspected; the caller is responsible for picking a root they control.
+func AssertNoSymlinkInSubpath(root, subpath string) error {
+	if subpath == "" || subpath == "." {
+		return nil
+	}
+	segments := strings.Split(filepath.ToSlash(subpath), "/")
+	cur := root
+	for _, seg := range segments {
+		if seg == "" || seg == "." || seg == ".." {
+			return fmt.Errorf("invalid subpath %q: contains empty or traversal segment", subpath)
+		}
+		cur = filepath.Join(cur, seg)
+		info, err := os.Lstat(cur)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to traverse symlink at %q (VC-53816)", cur)
+		}
+	}
 	return nil
 }
 

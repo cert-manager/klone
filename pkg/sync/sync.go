@@ -50,6 +50,10 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 				folders.Add(filepath.SplitList(src.FolderName)...)
 			}
 
+			if err := cache.AssertNoSymlinkInSubpath(workDirPath, target); err != nil {
+				return err
+			}
+
 			if err := os.MkdirAll(filepath.Join(workDirPath, target), 0755); err != nil {
 				return err
 			}
@@ -60,8 +64,9 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 			}
 
 			// 2) Sync all folders with cached files
+			targetRoot := filepath.Join(workDirPath, target)
 			for _, src := range srcs {
-				if err := cache.CloneWithCache(ctx, filepath.Join(workDirPath, target, src.FolderName), src.KloneSource, git.Get); err != nil {
+				if err := cache.CloneWithCache(ctx, targetRoot, src.FolderName, src.KloneSource, git.Get); err != nil {
 					return err
 				}
 			}
