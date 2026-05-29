@@ -21,12 +21,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-
-	"github.com/cert-manager/klone/pkg/mod"
 )
 
 func GetHash(ctx context.Context, repoURL string, ref string) (string, error) {
-	if err := mod.ValidateRepoURL(repoURL); err != nil {
+	if err := validateRepoURL(repoURL); err != nil {
 		return "", err
 	}
 

@@ -32,7 +32,7 @@ import (
 )
 
 func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, error) {
-	if err := mod.ValidateRepoURL(src.RepoURL); err != nil {
+	if err := validateRepoURL(src.RepoURL); err != nil {
 		return "", err
 	}
 

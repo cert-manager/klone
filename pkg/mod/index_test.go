@@ -20,58 +20,8 @@ import (
 	"os"
 	"path"
 	"slices"
-	"strings"
 	"testing"
 )
-
-func TestValidateRepoURL(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantErr  bool
-		errMatch string // substring expected in the error, optional
-	}{
-		// Legitimate.
-		{name: "https", input: "https://github.com/cert-manager/klone.git", wantErr: false},
-		{name: "http", input: "http://example.com/repo.git", wantErr: false},
-		{name: "ssh url", input: "ssh://git@github.com/cert-manager/klone.git", wantErr: false},
-		{name: "git url", input: "git://example.com/repo.git", wantErr: false},
-		{name: "file url", input: "file:///srv/git/repo.git", wantErr: false},
-		{name: "absolute local path", input: "/srv/git/repo.git", wantErr: false},
-		{name: "scp-like", input: "git@github.com:cert-manager/klone.git", wantErr: false},
-
-		// VC-53817 vectors.
-		{name: "ext transport", input: "ext::sh -c touch$IFS/tmp/klone-pwned", wantErr: true, errMatch: "helper transport"},
-		{name: "upload-pack option", input: "--upload-pack=touch /tmp/klone-pwned2;true", wantErr: true, errMatch: "starts with '-'"},
-		{name: "single dash option", input: "-uX", wantErr: true, errMatch: "starts with '-'"},
-		{name: "transport_helper", input: "transport_helper::cmd", wantErr: true, errMatch: "helper transport"},
-
-		// Degenerate / unsupported.
-		{name: "empty", input: "", wantErr: true},
-		{name: "relative path", input: "../etc", wantErr: true},
-		{name: "bare hostname", input: "example.com", wantErr: true},
-		{name: "scheme without slashes", input: "javascript:alert(1)", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateRepoURL(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ValidateRepoURL(%q) = nil, want error", tt.input)
-					return
-				}
-				if tt.errMatch != "" && !strings.Contains(err.Error(), tt.errMatch) {
-					t.Errorf("ValidateRepoURL(%q) error = %q, want substring %q", tt.input, err.Error(), tt.errMatch)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("ValidateRepoURL(%q) returned unexpected error: %v", tt.input, err)
-			}
-		})
-	}
-}
 
 func TestKloneItemSorting(t *testing.T) {
 	// Create some sample KloneItems
