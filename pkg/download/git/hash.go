@@ -21,9 +21,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/cert-manager/klone/pkg/mod"
 )
 
 func GetHash(ctx context.Context, repoURL string, ref string) (string, error) {
+	if err := mod.ValidateRepoURL(repoURL); err != nil {
+		return "", err
+	}
+
 	outBuffer := &bytes.Buffer{}
 	if err := runGitCmd(ctx, ".", outBuffer, os.Stderr, "ls-remote", "--", repoURL, ref); err != nil {
 		return "", err

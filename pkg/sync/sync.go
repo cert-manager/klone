@@ -31,10 +31,6 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 	workDir := mod.WorkDir(workDirPath)
 	if err := workDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
-			if err := mod.ValidateRepoURL(src.RepoURL); err != nil {
-				return err
-			}
-
 			src.RepoPath = filepath.Join(".", filepath.Clean(filepath.Join("/", src.RepoPath)))
 
 			if src.RepoHash == "" || forceUpgrade {
