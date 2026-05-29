@@ -24,8 +24,12 @@ import (
 )
 
 func GetHash(ctx context.Context, repoURL string, ref string) (string, error) {
+	if err := validateRepoURL(repoURL); err != nil {
+		return "", err
+	}
+
 	outBuffer := &bytes.Buffer{}
-	if err := runGitCmd(ctx, ".", outBuffer, os.Stderr, "ls-remote", repoURL, ref); err != nil {
+	if err := runGitCmd(ctx, ".", outBuffer, os.Stderr, "ls-remote", "--", repoURL, ref); err != nil {
 		return "", err
 	}
 
