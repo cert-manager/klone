@@ -55,13 +55,6 @@ func CloneWithCache(
 	src mod.KloneSource,
 	getFn func(getCtx context.Context, targetPath string, src mod.KloneSource) (string, error),
 ) error {
-	// VC-53816: refuse to traverse symlinks while resolving destSubpath
-	// underneath destRoot. A previous sync entry may have rsync'd an
-	// attacker-controlled symlink into an intermediate component; following
-	// it through os.MkdirAll + rsync would write outside destRoot.
-	if err := AssertNoSymlinkInSubpath(destRoot, destSubpath); err != nil {
-		return err
-	}
 	destPath := filepath.Join(destRoot, destSubpath)
 
 	cacheDir, err := getCacheDir()
@@ -112,13 +105,7 @@ func CloneWithCache(
 		return err
 	}
 
-	// The primary VC-53816 defence is AssertNoSymlinkInSubpath above; it
-	// refuses to traverse a planted symlink on the next sync. Adding
-	// --safe-links here would also drop unsafe symlinks at copy time on
-	// GNU rsync >= 3, but openrsync (the default on macOS) errors out
-	// rather than skipping them, which breaks cross-platform behaviour.
-	// Tracked as a follow-up hardening.
-	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
+	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aq", "--delete", "--safe-links", ".", destPath); err != nil {
 		return err
 	}
 
