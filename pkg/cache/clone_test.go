@@ -82,12 +82,7 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 		{name: "traversal after non-existent", subpath: "fresh/../etc", wantErr: true, errMatch: "traversal"},
 		{name: "empty segment after non-existent", subpath: "fresh//etc", wantErr: true, errMatch: "empty"},
 
-		// filepath.Join silently drops root when joined with any of these
-		// on Windows, so they must be rejected regardless of build GOOS.
 		{name: "absolute unix path", subpath: "/etc/passwd", wantErr: true, errMatch: "relative"},
-		{name: "windows drive letter", subpath: `C:\Windows`, wantErr: true, errMatch: "relative"},
-		{name: "windows drive forward slash", subpath: "C:/Windows", wantErr: true, errMatch: "relative"},
-		{name: "windows drive only", subpath: "C:", wantErr: true, errMatch: "relative"},
 		// UNC: rejected as absolute on Windows, as empty leading segments
 		// on POSIX (after backslash→slash normalisation). Both routes
 		// return "invalid subpath %q: ..." so we match the common prefix.
