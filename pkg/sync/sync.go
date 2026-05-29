@@ -74,9 +74,9 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 			}
 
 			// 2) Sync all folders with cached files
-			targetRoot := filepath.Join(workDirPath, target)
 			for _, src := range srcs {
-				if err := cache.CloneWithCache(ctx, targetRoot, src.FolderName, src.KloneSource, git.Get); err != nil {
+				destPath := filepath.Join(workDirPath, target, src.FolderName)
+				if err := cache.CloneWithCache(ctx, destPath, src.KloneSource, git.Get); err != nil {
 					return err
 				}
 			}

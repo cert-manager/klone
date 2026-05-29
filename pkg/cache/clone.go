@@ -50,13 +50,10 @@ func getCacheDir() (string, error) {
 
 func CloneWithCache(
 	ctx context.Context,
-	destRoot string,
-	destSubpath string,
+	destPath string,
 	src mod.KloneSource,
 	getFn func(getCtx context.Context, targetPath string, src mod.KloneSource) (string, error),
 ) error {
-	destPath := filepath.Join(destRoot, destSubpath)
-
 	cacheDir, err := getCacheDir()
 	if err != nil {
 		return err
