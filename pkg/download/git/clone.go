@@ -32,6 +32,10 @@ import (
 )
 
 func Get(ctx context.Context, targetPath string, src mod.KloneSource) (string, error) {
+	if err := mod.ValidateRepoURL(src.RepoURL); err != nil {
+		return "", err
+	}
+
 	fmt.Fprintf(os.Stdout, "Cloning %s from %s to %s on commit %s\n", src.RepoPath, src.RepoURL, targetPath, src.RepoHash)
 
 	if err := sparseCheckout(ctx, targetPath, src.RepoURL, src.RepoHash, []string{src.RepoPath}); err != nil {
