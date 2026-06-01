@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -114,32 +115,20 @@ func CloneWithCache(
 // Non-existent components are treated as a clean tail (we'll create them
 // shortly with os.MkdirAll). root itself is assumed trusted and is not
 // inspected; the caller is responsible for picking a root they control.
-//
-// Validation runs in two passes so the string-shape check is not
-// short-circuited by an earlier non-existent component. Without this,
-// inputs like "fresh/../etc" would pass — iter 0 ("fresh") hits IsNotExist
-// and returns nil before iter 1 (the "..") is ever inspected.
 func AssertNoSymlinkInSubpath(root, subpath string) error {
 	if subpath == "" || subpath == "." {
 		return nil
 	}
-	if filepath.IsAbs(subpath) || filepath.VolumeName(subpath) != "" {
+	normalised := strings.ReplaceAll(subpath, "\\", "/")
+	if filepath.IsAbs(normalised) || filepath.VolumeName(normalised) != "" {
 		return fmt.Errorf("invalid subpath %q: must be relative without volume or drive prefix", subpath)
 	}
-	normalised := strings.ReplaceAll(subpath, "\\", "/")
-	segments := strings.Split(normalised, "/")
-
-	// Pass 1: pure-string validation of every segment, independent of filesystem state.
-	for _, seg := range segments {
-		if seg == "" || seg == "." || seg == ".." {
-			return fmt.Errorf("invalid subpath %q: contains empty or traversal segment", subpath)
-		}
+	cleaned := path.Clean(normalised)
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return fmt.Errorf("invalid subpath %q: escapes root", subpath)
 	}
-
-	// Pass 2: Lstat walk for the prefix that exists; non-existent tails
-	// will be created by MkdirAll a moment later.
 	cur := root
-	for _, seg := range segments {
+	for _, seg := range strings.Split(cleaned, "/") {
 		cur = filepath.Join(cur, seg)
 		info, err := os.Lstat(cur)
 		if err != nil {

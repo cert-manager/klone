@@ -73,24 +73,23 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 		{name: "symlink as intermediate", subpath: "sym/anything", wantErr: true, errMatch: "symlink"},
 		{name: "symlink as final", subpath: "a/blink", wantErr: true, errMatch: "symlink"},
 
-		// Traversal segments should be rejected outright (defense in depth).
-		{name: "traversal", subpath: "a/../etc", wantErr: true, errMatch: "traversal"},
-		{name: "lone dotdot", subpath: "..", wantErr: true, errMatch: "traversal"},
-		// Traversal must still be rejected when it follows a segment that
-		// does not yet exist on disk — the pure-string validation pass has
-		// to run independently of the Lstat walk's IsNotExist short-circuit.
-		{name: "traversal after non-existent", subpath: "fresh/../etc", wantErr: true, errMatch: "traversal"},
-		{name: "empty segment after non-existent", subpath: "fresh//etc", wantErr: true, errMatch: "empty"},
+		// path.Clean canonicalises inner traversal, so these resolve to a
+		// safe path under root and must be accepted.
+		{name: "inner traversal canonicalises", subpath: "a/../etc", wantErr: false},
+		{name: "inner traversal after non-existent", subpath: "fresh/../etc", wantErr: false},
+		{name: "empty segment canonicalises", subpath: "fresh//etc", wantErr: false},
+		{name: "backslash inner traversal", subpath: `a\..\etc`, wantErr: false},
+
+		// Net upward escapes must be rejected — Clean preserves a leading "..".
+		{name: "lone dotdot", subpath: "..", wantErr: true, errMatch: "escapes root"},
+		{name: "leading dotdot", subpath: "../etc", wantErr: true, errMatch: "escapes root"},
+		{name: "net escape via inner dotdot", subpath: "a/../../etc", wantErr: true, errMatch: "escapes root"},
+		{name: "backslash net escape", subpath: `a\..\..\etc`, wantErr: true, errMatch: "escapes root"},
 
 		{name: "absolute unix path", subpath: "/etc/passwd", wantErr: true, errMatch: "relative"},
-		// UNC: rejected as absolute on Windows, as empty leading segments
-		// on POSIX (after backslash→slash normalisation). Both routes
-		// return "invalid subpath %q: ..." so we match the common prefix.
+		// UNC normalises to "//server/share/x", which IsAbs catches as
+		// absolute on POSIX and VolumeName catches on Windows.
 		{name: "unc path", subpath: `\\server\share\x`, wantErr: true, errMatch: "invalid subpath"},
-
-		// Backslash-separated traversal must be caught on every GOOS, not
-		// only on Windows where filepath.ToSlash would normalise it.
-		{name: "backslash traversal", subpath: `a\..\etc`, wantErr: true, errMatch: "traversal"},
 	}
 
 	for _, tt := range tests {
