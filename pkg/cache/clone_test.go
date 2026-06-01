@@ -64,6 +64,8 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 	}{
 		{name: "empty subpath", subpath: "", wantErr: false},
 		{name: "dot subpath", subpath: ".", wantErr: false},
+		// "a/.." cleans to "." → refers to root, which the contract leaves untouched.
+		{name: "cancels to dot", subpath: "a/..", wantErr: false},
 		{name: "all regular dirs", subpath: "a/b", wantErr: false},
 		{name: "non-existent leaf", subpath: "a/b/new", wantErr: false},
 		{name: "non-existent intermediate", subpath: "fresh/leaf", wantErr: false},

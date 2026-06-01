@@ -124,6 +124,9 @@ func AssertNoSymlinkInSubpath(root, subpath string) error {
 		return fmt.Errorf("invalid subpath %q: must be relative without volume or drive prefix", subpath)
 	}
 	cleaned := path.Clean(normalised)
+	if cleaned == "." {
+		return nil
+	}
 	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return fmt.Errorf("invalid subpath %q: escapes root", subpath)
 	}
