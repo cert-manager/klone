@@ -56,12 +56,14 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 			return nil
 		},
 		func(target string, srcs mod.KloneFolder) error {
+			canonical := make([]string, len(srcs))
 			folders := newTreeNode()
-			for _, src := range srcs {
+			for i, src := range srcs {
 				segments, err := splitFolderName(src.FolderName)
 				if err != nil {
 					return err
 				}
+				canonical[i] = filepath.Join(segments...)
 				folders.Add(segments...)
 			}
 
@@ -83,8 +85,8 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 			// deleted by os.RemoveAll on the first post-fix run. The same
 			// walk also covers the in-tree (safe-by-rsync) symlink that an
 			// earlier iteration may have planted to redirect later writes.
-			for _, src := range srcs {
-				if err := cache.AssertNoSymlinkInSubpath(targetRoot, src.FolderName); err != nil {
+			for i := range srcs {
+				if err := cache.AssertNoSymlinkInSubpath(targetRoot, canonical[i]); err != nil {
 					return err
 				}
 			}
@@ -95,8 +97,8 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 			}
 
 			// 2) Sync all folders with cached files
-			for _, src := range srcs {
-				if err := cache.CloneWithCache(ctx, filepath.Join(targetRoot, src.FolderName), src.KloneSource, git.Get); err != nil {
+			for i, src := range srcs {
+				if err := cache.CloneWithCache(ctx, filepath.Join(targetRoot, canonical[i]), src.KloneSource, git.Get); err != nil {
 					return err
 				}
 			}

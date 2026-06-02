@@ -150,6 +150,40 @@ func TestSplitFolderName(t *testing.T) {
 	}
 }
 
+// TestSplitFolderName_CanonicalRoundTrip pins the property SyncFolder
+// relies on: filepath.Join(splitFolderName(x)...) is the canonical
+// OS-separator form, identical regardless of which mixed-separator
+// spelling the manifest used. The bug this guards against is the
+// pre-canonicalisation behaviour where on Unix `a\b` would parse into
+// a nested tree but the raw string would also be used as a literal
+// directory name in CloneWithCache and the preflight — so cleanup,
+// preflight, and write would each see a different path.
+func TestSplitFolderName_CanonicalRoundTrip(t *testing.T) {
+	sep := string(filepath.Separator)
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "single", input: "a", want: "a"},
+		{name: "slash", input: "a/b/c", want: "a" + sep + "b" + sep + "c"},
+		{name: "backslash", input: `a\b\c`, want: "a" + sep + "b" + sep + "c"},
+		{name: "mixed", input: `a\b/c`, want: "a" + sep + "b" + sep + "c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			segs, err := splitFolderName(tt.input)
+			if err != nil {
+				t.Fatalf("splitFolderName(%q) unexpected error: %v", tt.input, err)
+			}
+			got := filepath.Join(segs...)
+			if got != tt.want {
+				t.Errorf("filepath.Join(splitFolderName(%q)...) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestTreeNodeCleanup_PartialTreeIsNoOp pins the regression that surfaced
 // alongside the VC-53818 splitter fix: once folder_name parses into a
 // multi-segment tree, Cleanup recurses into intermediates that do not
