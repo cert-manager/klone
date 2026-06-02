@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cert-manager/klone/pkg/cache"
 	"github.com/cert-manager/klone/pkg/download/git"
@@ -57,7 +58,11 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 		func(target string, srcs mod.KloneFolder) error {
 			folders := newTreeNode()
 			for _, src := range srcs {
-				folders.Add(filepath.SplitList(src.FolderName)...)
+				segments, err := splitFolderName(src.FolderName)
+				if err != nil {
+					return err
+				}
+				folders.Add(segments...)
 			}
 
 			if err := cache.AssertNoSymlinkInSubpath(workDirPath, target); err != nil {
@@ -142,6 +147,13 @@ func (tn treeNode) Cleanup(root string) error {
 
 	entries, err := os.ReadDir(root)
 	if err != nil {
+		// Once splitFolderName produces multi-segment trees, Cleanup
+		// recurses into intermediate dirs that may not exist on first
+		// sync (the previous SplitList bug always produced flat trees,
+		// hiding this). Treat missing as "no entries to clean".
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -163,4 +175,44 @@ func (tn treeNode) Cleanup(root string) error {
 	}
 
 	return nil
+}
+
+// splitFolderName parses a manifest folder_name into path segments. The
+// previous implementation used filepath.SplitList, which splits on the
+// PATH env separator (':' on Unix, ';' on Windows), not the path-component
+// separator — so a manifest entry like "..:..:.." became three ".."
+// segments fed into treeNode.Cleanup, which then escaped the target tree.
+// This splitter uses the path-component separator and rejects every
+// segment shape that could traverse outside the target.
+func splitFolderName(folderName string) ([]string, error) {
+	if folderName == "" {
+		return nil, fmt.Errorf("invalid folder_name %q: empty", folderName)
+	}
+	if hasWindowsDrivePrefix(folderName) {
+		return nil, fmt.Errorf("invalid folder_name %q: Windows volume prefix is not allowed", folderName)
+	}
+	if filepath.IsAbs(folderName) || filepath.VolumeName(folderName) != "" {
+		return nil, fmt.Errorf("invalid folder_name %q: absolute paths and volume prefixes are not allowed", folderName)
+	}
+	// strings.ReplaceAll, not filepath.ToSlash: ToSlash is a no-op on Unix,
+	// which would let a Linux-authored manifest smuggle "a\b" past
+	// validation for a Windows victim where it would resolve as "a/b".
+	normalised := strings.ReplaceAll(folderName, `\`, "/")
+	segments := strings.Split(normalised, "/")
+	for _, seg := range segments {
+		if seg == "" || seg == "." || seg == ".." {
+			return nil, fmt.Errorf("invalid folder_name %q: empty or traversal segment %q", folderName, seg)
+		}
+	}
+	return segments, nil
+}
+
+// hasWindowsDrivePrefix catches drive-qualified paths on every GOOS;
+// filepath.VolumeName only recognises the shape when GOOS=windows.
+func hasWindowsDrivePrefix(s string) bool {
+	if len(s) < 2 || s[1] != ':' {
+		return false
+	}
+	c := s[0]
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 }
