@@ -163,7 +163,23 @@ func (tn treeNode) Cleanup(root string) error {
 			continue
 		}
 
-		if err := os.RemoveAll(filepath.Join(root, entryName)); err != nil {
+		entryPath := filepath.Join(root, entryName)
+		// Re-Lstat the entry just before RemoveAll. If an attacker with
+		// concurrent write access swapped a regular directory for a symlink
+		// between ReadDir and now, RemoveAll's behaviour on the symlinked
+		// path is platform-dependent. Refusing closes the window.
+		entryInfo, err := os.Lstat(entryPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if entryInfo.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("treeNode.Cleanup: refusing to remove symlink entry %q (VC-53818)", entryPath)
+		}
+
+		if err := os.RemoveAll(entryPath); err != nil {
 			return err
 		}
 	}
