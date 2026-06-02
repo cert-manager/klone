@@ -68,21 +68,29 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 				return err
 			}
 
+			targetRoot := filepath.Join(workDirPath, target)
+
+			// Pre-flight: walk every prefix of each folder_name before Cleanup
+			// runs. Cleanup recurses via os.ReadDir, which follows symlinks,
+			// so a pre-planted symlink at any intermediate directory (e.g.
+			// workDir/vendored/a -> /etc, left over from a compromised state
+			// prior to this fix) would otherwise have its target's entries
+			// deleted by os.RemoveAll on the first post-fix run. The same
+			// walk also covers the in-tree (safe-by-rsync) symlink that an
+			// earlier iteration may have planted to redirect later writes.
+			for _, src := range srcs {
+				if err := cache.AssertNoSymlinkInSubpath(targetRoot, src.FolderName); err != nil {
+					return err
+				}
+			}
+
 			// 1) Remove all folders that are not defined in srcs
-			if err := folders.Cleanup(filepath.Join(workDirPath, target)); err != nil {
+			if err := folders.Cleanup(targetRoot); err != nil {
 				return err
 			}
 
 			// 2) Sync all folders with cached files
-			targetRoot := filepath.Join(workDirPath, target)
 			for _, src := range srcs {
-				// --safe-links drops upstream-planted symlinks at copy time, but a
-				// safe (in-tree) symlink planted by an earlier iteration can still
-				// redirect this iteration's writes within targetRoot. Refuse to
-				// traverse it.
-				if err := cache.AssertNoSymlinkInSubpath(targetRoot, src.FolderName); err != nil {
-					return err
-				}
 				if err := cache.CloneWithCache(ctx, filepath.Join(targetRoot, src.FolderName), src.KloneSource, git.Get); err != nil {
 					return err
 				}

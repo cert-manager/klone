@@ -40,11 +40,13 @@ func TestAssertNoSymlinkInSubpath(t *testing.T) {
 	skipIfNoSymlinks(t)
 	root := t.TempDir()
 
-	// Layout:
-	//   root/a               (regular dir)
-	//   root/a/b             (regular dir)
-	//   root/sym -> /tmp     (symlink)
-	//   root/a/blink -> /tmp (symlink as final component)
+	// Layout (linkTarget = root/a/b, an in-tree dir — the planted symlinks
+	// are still symlinks regardless of where they point, which is all the
+	// helper inspects):
+	//   root/a                       (regular dir)
+	//   root/a/b                     (regular dir, used as linkTarget)
+	//   root/sym       -> root/a/b   (symlink at root)
+	//   root/a/blink   -> root/a/b   (symlink as final component)
 	if err := os.MkdirAll(filepath.Join(root, "a", "b"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
