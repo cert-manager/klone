@@ -28,6 +28,16 @@ import (
 )
 
 func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) error {
+	// AssertNoSymlinkInSubpath treats workDirPath as a trusted root and
+	// does not inspect it. Resolve symlinks once up-front so a caller
+	// invoking klone from inside a symlinked path cannot shift the trust
+	// boundary above the intended directory.
+	resolved, err := filepath.EvalSymlinks(workDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve workDir %q: %w", workDirPath, err)
+	}
+	workDirPath = resolved
+
 	workDir := mod.WorkDir(workDirPath)
 	if err := workDir.FetchTargets(
 		func(_ string, _ string, src *mod.KloneSource) error {
@@ -50,18 +60,38 @@ func SyncFolder(ctx context.Context, workDirPath string, forceUpgrade bool) erro
 				folders.Add(filepath.SplitList(src.FolderName)...)
 			}
 
+			if err := cache.AssertNoSymlinkInSubpath(workDirPath, target); err != nil {
+				return err
+			}
+
 			if err := os.MkdirAll(filepath.Join(workDirPath, target), 0755); err != nil {
 				return err
 			}
 
+			targetRoot := filepath.Join(workDirPath, target)
+
+			// Pre-flight: walk every prefix of each folder_name before Cleanup
+			// runs. Cleanup recurses via os.ReadDir, which follows symlinks,
+			// so a pre-planted symlink at any intermediate directory (e.g.
+			// workDir/vendored/a -> /etc, left over from a compromised state
+			// prior to this fix) would otherwise have its target's entries
+			// deleted by os.RemoveAll on the first post-fix run. The same
+			// walk also covers the in-tree (safe-by-rsync) symlink that an
+			// earlier iteration may have planted to redirect later writes.
+			for _, src := range srcs {
+				if err := cache.AssertNoSymlinkInSubpath(targetRoot, src.FolderName); err != nil {
+					return err
+				}
+			}
+
 			// 1) Remove all folders that are not defined in srcs
-			if err := folders.Cleanup(filepath.Join(workDirPath, target)); err != nil {
+			if err := folders.Cleanup(targetRoot); err != nil {
 				return err
 			}
 
 			// 2) Sync all folders with cached files
 			for _, src := range srcs {
-				if err := cache.CloneWithCache(ctx, filepath.Join(workDirPath, target, src.FolderName), src.KloneSource, git.Get); err != nil {
+				if err := cache.CloneWithCache(ctx, filepath.Join(targetRoot, src.FolderName), src.KloneSource, git.Get); err != nil {
 					return err
 				}
 			}

@@ -23,7 +23,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cert-manager/klone/pkg/mod"
@@ -101,10 +103,47 @@ func CloneWithCache(
 		return err
 	}
 
-	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aEq", "--delete", ".", destPath); err != nil {
+	if err := runRsyncCmd(ctx, cachePath, os.Stdout, os.Stderr, "-aq", "--delete", "--safe-links", ".", destPath); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// AssertNoSymlinkInSubpath walks each component of subpath relative to root
+// and returns an error if any cumulative path exists and is a symlink.
+// Non-existent components are treated as a clean tail (we'll create them
+// shortly with os.MkdirAll). root itself is assumed trusted and is not
+// inspected; the caller is responsible for picking a root they control.
+func AssertNoSymlinkInSubpath(root, subpath string) error {
+	if subpath == "" || subpath == "." {
+		return nil
+	}
+	normalised := strings.ReplaceAll(subpath, "\\", "/")
+	if filepath.IsAbs(normalised) || filepath.VolumeName(normalised) != "" {
+		return fmt.Errorf("invalid subpath %q: must be relative without volume or drive prefix", subpath)
+	}
+	cleaned := path.Clean(normalised)
+	if cleaned == "." {
+		return nil
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return fmt.Errorf("invalid subpath %q: escapes root", subpath)
+	}
+	cur := root
+	for _, seg := range strings.Split(cleaned, "/") {
+		cur = filepath.Join(cur, seg)
+		info, err := os.Lstat(cur)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to traverse symlink at %q (VC-53816)", cur)
+		}
+	}
 	return nil
 }
 
