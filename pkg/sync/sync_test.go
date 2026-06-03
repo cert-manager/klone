@@ -88,3 +88,174 @@ func TestSyncFolder_TargetSymlinkRejected(t *testing.T) {
 		t.Errorf("VC-53816 root-symlink escape: decoy sentinel was removed: %v", err)
 	}
 }
+
+// TestSplitFolderName covers the manifest-input parser that replaces the
+// buggy filepath.SplitList call (VC-53818). The original split-on-PATH-sep
+// behaviour turned "..:..:.." into three ".." segments; this parser
+// produces a single literal segment for the same input and rejects every
+// traversal/absolute/volume-prefixed shape.
+func TestSplitFolderName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		want     []string
+		wantErr  bool
+		errMatch string
+	}{
+		// Valid shapes.
+		{name: "single segment", input: "a", want: []string{"a"}},
+		{name: "nested slash", input: "a/b/c", want: []string{"a", "b", "c"}},
+		{name: "nested backslash", input: `a\b\c`, want: []string{"a", "b", "c"}},
+		{name: "mixed separators", input: `a\b/c`, want: []string{"a", "b", "c"}},
+		// VC-53818: the disclosed payload is now a literal single-segment
+		// name, not three ".." traversal segments. Unusual but not a
+		// traversal vector.
+		{name: "colon payload kept as literal", input: "..:..:..", want: []string{"..:..:.."}},
+
+		// Rejections.
+		{name: "empty", input: "", wantErr: true, errMatch: "empty"},
+		{name: "lone dot", input: ".", wantErr: true, errMatch: "traversal segment"},
+		{name: "lone dotdot", input: "..", wantErr: true, errMatch: "traversal segment"},
+		{name: "leading dotdot", input: "../etc", wantErr: true, errMatch: "traversal segment"},
+		{name: "inner dotdot", input: "a/../etc", wantErr: true, errMatch: "traversal segment"},
+		{name: "empty segment", input: "a//b", wantErr: true, errMatch: "empty or traversal"},
+		{name: "absolute unix", input: "/etc/passwd", wantErr: true, errMatch: "absolute"},
+		{name: "windows drive upper", input: `C:\tmp`, wantErr: true, errMatch: "Windows volume"},
+		{name: "windows drive lower", input: "c:/tmp", wantErr: true, errMatch: "Windows volume"},
+		// UNC paths: backslash normalisation turns `\\srv\share\x` into
+		// `//srv/share/x`, which IsAbs catches as absolute on POSIX and
+		// VolumeName catches on Windows.
+		{name: "unc path", input: `\\server\share\x`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := splitFolderName(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("splitFolderName(%q) = %v, nil; want error", tt.input, got)
+				}
+				if tt.errMatch != "" && !strings.Contains(err.Error(), tt.errMatch) {
+					t.Errorf("splitFolderName(%q) error = %q, want substring %q", tt.input, err.Error(), tt.errMatch)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("splitFolderName(%q) returned unexpected error: %v", tt.input, err)
+			}
+			if !equalSegments(got, tt.want) {
+				t.Errorf("splitFolderName(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSplitFolderName_CanonicalRoundTrip pins the property SyncFolder
+// relies on: filepath.Join(splitFolderName(x)...) is the canonical
+// OS-separator form, identical regardless of which mixed-separator
+// spelling the manifest used. The bug this guards against is the
+// pre-canonicalisation behaviour where on Unix `a\b` would parse into
+// a nested tree but the raw string would also be used as a literal
+// directory name in CloneWithCache and the preflight — so cleanup,
+// preflight, and write would each see a different path.
+func TestSplitFolderName_CanonicalRoundTrip(t *testing.T) {
+	sep := string(filepath.Separator)
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "single", input: "a", want: "a"},
+		{name: "slash", input: "a/b/c", want: "a" + sep + "b" + sep + "c"},
+		{name: "backslash", input: `a\b\c`, want: "a" + sep + "b" + sep + "c"},
+		{name: "mixed", input: `a\b/c`, want: "a" + sep + "b" + sep + "c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			segs, err := splitFolderName(tt.input)
+			if err != nil {
+				t.Fatalf("splitFolderName(%q) unexpected error: %v", tt.input, err)
+			}
+			got := filepath.Join(segs...)
+			if got != tt.want {
+				t.Errorf("filepath.Join(splitFolderName(%q)...) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestTreeNodeCleanup_PartialTreeIsNoOp pins the regression that surfaced
+// alongside the VC-53818 splitter fix: once folder_name parses into a
+// multi-segment tree, Cleanup recurses into intermediates that do not
+// exist on first sync, and ReadDir errors with ENOENT. The fix turns
+// ENOENT into a no-op; this test fails if that handling regresses.
+func TestTreeNodeCleanup_PartialTreeIsNoOp(t *testing.T) {
+	root := t.TempDir()
+	tn := newTreeNode()
+	tn.Add("a", "b", "c")
+	if err := tn.Cleanup(root); err != nil {
+		t.Errorf("Cleanup on tree with missing intermediates returned error: %v", err)
+	}
+}
+
+func equalSegments(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestSyncFolder_ColonPayloadDoesNotEscape is the end-to-end regression
+// for VC-53818. Pre-fix, "..:..:.." would split into three ".." segments
+// and Cleanup would RemoveAll directories above the working directory.
+// Post-fix, the colon payload is a valid single literal segment, so
+// validation passes and SyncFolder proceeds to a git fetch that fails on
+// the bogus repo — but no escape occurs.
+func TestSyncFolder_ColonPayloadDoesNotEscape(t *testing.T) {
+	sb := t.TempDir()
+	victim := filepath.Join(sb, "buffer", "L3", "L2", "L1", "victim")
+	if err := os.MkdirAll(victim, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	sentinels := []string{
+		filepath.Join(sb, "buffer", "L3", "L2", "L1", "SENTINEL-L1"),
+		filepath.Join(sb, "buffer", "L3", "L2", "SENTINEL-L2"),
+		filepath.Join(sb, "buffer", "L3", "SENTINEL-L3"),
+	}
+	for _, p := range sentinels {
+		if err := os.WriteFile(p, []byte("sentinel"), 0o644); err != nil {
+			t.Fatalf("setup sentinel %s: %v", p, err)
+		}
+	}
+
+	manifest := `targets:
+  vendored:
+    - folder_name: "..:..:.."
+      repo_url: /nonexistent-klone-poc-repo
+      repo_ref: main
+      repo_hash: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+      repo_path: .
+`
+	if err := os.WriteFile(filepath.Join(victim, "klone.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	t.Setenv("KLONE_CACHE_DIR", filepath.Join(sb, "cache"))
+	// Bogus repo means SyncFolder must report a non-nil error. The real
+	// CVE proof is that the sentinels above the working dir survive.
+	if err := SyncFolder(t.Context(), victim, false); err == nil {
+		t.Fatalf("SyncFolder returned nil for bogus manifest, want error")
+	}
+
+	for _, p := range sentinels {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("VC-53818 escape: sentinel %s was wrongfully removed: %v", p, err)
+		}
+	}
+}
