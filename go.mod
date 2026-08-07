@@ -3,7 +3,7 @@ module github.com/cert-manager/klone
 go 1.25
 
 require (
-	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
