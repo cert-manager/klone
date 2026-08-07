@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 
 	"github.com/cert-manager/klone/pkg/mod"
 )
